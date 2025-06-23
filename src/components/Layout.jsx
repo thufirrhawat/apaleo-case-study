@@ -69,22 +69,37 @@ const Layout = ({ onLogout }) => {
 
   // Presentation Timer State
   const [timerState, setTimerState] = useState(loadTimerState());
-  const [timerInterval, setTimerInterval] = useState(null);
 
-  // Auto-restart timer if it was running before refresh
+  // Unified timer effect
   useEffect(() => {
-    if (timerState.isRunning && !timerInterval) {
-      console.log('Auto-restarting timer after refresh');
-      const interval = setInterval(() => {
+    let interval = null;
+    
+    // Only run the timer if isRunning is true
+    if (timerState.isRunning && !timerState.isPaused) {
+      console.log('Timer effect: Starting or resuming interval.');
+      interval = setInterval(() => {
         setTimerState(prev => {
-          const newState = { ...prev, time: prev.time + 1 };
+          const newTime = prev.time + 1;
+          // We only update time here; isRunning state is handled by button clicks
+          const newState = { ...prev, time: newTime };
+          // Save state on each tick to persist across reloads
           saveTimerState(newState);
           return newState;
         });
       }, 1000);
-      setTimerInterval(interval);
+    } else {
+      console.log('Timer effect: Clearing interval.');
+      // If not running or paused, do nothing, the interval is already null
     }
-  }, []); // Only run on mount
+
+    // Cleanup function: this is crucial
+    return () => {
+      if (interval) {
+        console.log('Timer effect: Cleanup - clearing interval.');
+        clearInterval(interval);
+      }
+    };
+  }, [timerState.isRunning, timerState.isPaused]); // Rerun effect when running/paused state changes
 
   // Map URL slugs to section constants
   const urlToSection = {
@@ -151,31 +166,21 @@ const Layout = ({ onLogout }) => {
   // Presentation Timer Functions
   const startTimer = () => {
     console.log('Starting presentation timer');
-    if (!timerState.isRunning) {
-      const interval = setInterval(() => {
-        setTimerState(prev => {
-          const newState = { ...prev, time: prev.time + 1 };
-          saveTimerState(newState);
-          return newState;
-        });
-      }, 1000);
-      setTimerInterval(interval);
+    setTimerState(prev => {
       const newState = {
-        ...timerState,
+        ...prev,
         isRunning: true,
-        isPaused: false
+        isPaused: false,
+        // If it was paused, we don't reset the time
+        time: prev.isPaused ? prev.time : 0
       };
-      setTimerState(newState);
       saveTimerState(newState);
-    }
+      return newState;
+    });
   };
 
   const pauseTimer = () => {
     console.log('Pausing presentation timer');
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      setTimerInterval(null);
-    }
     setTimerState(prev => {
       const newState = { ...prev, isRunning: false, isPaused: true };
       saveTimerState(newState);
@@ -185,10 +190,6 @@ const Layout = ({ onLogout }) => {
 
   const stopTimer = () => {
     console.log('Stopping presentation timer');
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      setTimerInterval(null);
-    }
     const newState = { time: 0, isRunning: false, isPaused: false };
     setTimerState(newState);
     saveTimerState(newState);
@@ -244,15 +245,6 @@ const Layout = ({ onLogout }) => {
       };
     }
   }, [isDragging, dragOffset]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
-    };
-  }, [timerInterval]);
 
   // Track window size for mobile detection
   useEffect(() => {
