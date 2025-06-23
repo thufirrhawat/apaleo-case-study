@@ -6,7 +6,7 @@ This interactive web application presents a detailed case study for the role of 
 
 The project is deployed and can be viewed live on GitHub Pages:
 
-**[https://nuri.github.io/apaleo-case-study/](https://nuri.github.io/apaleo-case-study/)**
+**[https://thufirrhawat.github.io/apaleo-case-study/](https://thufirrhawat.github.io/apaleo-case-study/)**
 
 _(Note: You will need the passcode provided to access the content.)_
 
@@ -29,7 +29,7 @@ _(Note: You will need the passcode provided to access the content.)_
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/nuri/apaleo-case-study.git
+    git clone https://github.com/thufirrhawat/apaleo-case-study.git
     cd apaleo-case-study
     ```
 

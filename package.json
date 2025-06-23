@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://nuri.github.io/apaleo-case-study",
+  "homepage": "https://thufirrhawat.github.io/apaleo-case-study",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
