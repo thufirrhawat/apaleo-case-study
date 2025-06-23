@@ -38,10 +38,13 @@ const Layout = ({ onLogout }) => {
       const saved = sessionStorage.getItem('presentationTimer');
       if (saved) {
         const parsed = JSON.parse(saved);
+        const now = Date.now();
+        const timeDiff = Math.floor((now - (parsed.timestamp || now)) / 1000);
+        
         return {
-          time: parsed.time || 0,
-          isRunning: false, // Always start as paused on refresh
-          isPaused: parsed.time > 0 // If there's time, it was paused
+          time: (parsed.time || 0) + (parsed.isRunning ? timeDiff : 0),
+          isRunning: parsed.isRunning || false,
+          isPaused: parsed.isPaused || false
         };
       }
     } catch (error) {
@@ -55,6 +58,8 @@ const Layout = ({ onLogout }) => {
     try {
       sessionStorage.setItem('presentationTimer', JSON.stringify({
         time: state.time,
+        isRunning: state.isRunning,
+        isPaused: state.isPaused,
         timestamp: Date.now()
       }));
     } catch (error) {
@@ -65,6 +70,21 @@ const Layout = ({ onLogout }) => {
   // Presentation Timer State
   const [timerState, setTimerState] = useState(loadTimerState());
   const [timerInterval, setTimerInterval] = useState(null);
+
+  // Auto-restart timer if it was running before refresh
+  useEffect(() => {
+    if (timerState.isRunning && !timerInterval) {
+      console.log('Auto-restarting timer after refresh');
+      const interval = setInterval(() => {
+        setTimerState(prev => {
+          const newState = { ...prev, time: prev.time + 1 };
+          saveTimerState(newState);
+          return newState;
+        });
+      }, 1000);
+      setTimerInterval(interval);
+    }
+  }, []); // Only run on mount
 
   // Map URL slugs to section constants
   const urlToSection = {
@@ -140,11 +160,13 @@ const Layout = ({ onLogout }) => {
         });
       }, 1000);
       setTimerInterval(interval);
-      setTimerState(prev => ({
-        ...prev,
+      const newState = {
+        ...timerState,
         isRunning: true,
         isPaused: false
-      }));
+      };
+      setTimerState(newState);
+      saveTimerState(newState);
     }
   };
 
