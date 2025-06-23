@@ -6,7 +6,7 @@ import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Router basename="/apaleo-case-study-app-success-manager/">
+    <Router basename="/apaleo-case-study/">
       <App />
     </Router>
   </StrictMode>,
