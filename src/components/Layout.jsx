@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X, Home, ChevronLeft, ChevronRight, Play, Pause, Square, RotateCcw, Clock } from 'lucide-react';
+import { LogOut, Menu, X, Home, ChevronLeft, ChevronRight, Play, Pause, Square, RotateCcw, Clock, Move } from 'lucide-react';
 import { setAuthStatus, getDemoState, saveDemoState } from '../utils/storage';
 import { SECTIONS, SECTION_LABELS, SECTION_DESCRIPTIONS, APP_CONFIG } from '../utils/constants';
 import nuriPp from '../assets/images/nuri-pp.png';
@@ -16,7 +16,6 @@ import PartnerProfile from './sections/PartnerProfile';
 import IntegrationWorkflow from './sections/IntegrationWorkflow';
 import ApiRequirements from './sections/ApiRequirements';
 import UseCaseDemo from './sections/UseCaseDemo';
-
 import Sources from './sections/Sources';
 
 const Layout = ({ onLogout }) => {
@@ -26,12 +25,45 @@ const Layout = ({ onLogout }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [demoState, setDemoState] = useState(getDemoState());
   
+  // Floating timer state
+  const [floatingTimerPosition, setFloatingTimerPosition] = useState({ x: 20, y: 20 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
+  const floatingTimerRef = useRef(null);
+  
+  // Load timer state from session storage
+  const loadTimerState = () => {
+    try {
+      const saved = sessionStorage.getItem('presentationTimer');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          time: parsed.time || 0,
+          isRunning: false, // Always start as paused on refresh
+          isPaused: parsed.time > 0 // If there's time, it was paused
+        };
+      }
+    } catch (error) {
+      console.error('Error loading timer state:', error);
+    }
+    return { time: 0, isRunning: false, isPaused: false };
+  };
+
+  // Save timer state to session storage
+  const saveTimerState = (state) => {
+    try {
+      sessionStorage.setItem('presentationTimer', JSON.stringify({
+        time: state.time,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Error saving timer state:', error);
+    }
+  };
+
   // Presentation Timer State
-  const [timerState, setTimerState] = useState({
-    time: 0, // time in seconds
-    isRunning: false,
-    isPaused: false
-  });
+  const [timerState, setTimerState] = useState(loadTimerState());
   const [timerInterval, setTimerInterval] = useState(null);
 
   // Map URL slugs to section constants
@@ -101,10 +133,11 @@ const Layout = ({ onLogout }) => {
     console.log('Starting presentation timer');
     if (!timerState.isRunning) {
       const interval = setInterval(() => {
-        setTimerState(prev => ({
-          ...prev,
-          time: prev.time + 1
-        }));
+        setTimerState(prev => {
+          const newState = { ...prev, time: prev.time + 1 };
+          saveTimerState(newState);
+          return newState;
+        });
       }, 1000);
       setTimerInterval(interval);
       setTimerState(prev => ({
@@ -121,11 +154,11 @@ const Layout = ({ onLogout }) => {
       clearInterval(timerInterval);
       setTimerInterval(null);
     }
-    setTimerState(prev => ({
-      ...prev,
-      isRunning: false,
-      isPaused: true
-    }));
+    setTimerState(prev => {
+      const newState = { ...prev, isRunning: false, isPaused: true };
+      saveTimerState(newState);
+      return newState;
+    });
   };
 
   const stopTimer = () => {
@@ -134,11 +167,9 @@ const Layout = ({ onLogout }) => {
       clearInterval(timerInterval);
       setTimerInterval(null);
     }
-    setTimerState({
-      time: 0,
-      isRunning: false,
-      isPaused: false
-    });
+    const newState = { time: 0, isRunning: false, isPaused: false };
+    setTimerState(newState);
+    saveTimerState(newState);
   };
 
   const formatTime = (seconds) => {
@@ -146,6 +177,51 @@ const Layout = ({ onLogout }) => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Floating timer drag handlers
+  const handleMouseDown = (e) => {
+    if (!floatingTimerRef.current) return;
+    
+    const rect = floatingTimerRef.current.getBoundingClientRect();
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    
+    const newX = e.clientX - dragOffset.x;
+    const newY = e.clientY - dragOffset.y;
+    
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - 120;
+    const maxY = window.innerHeight - 80;
+    
+    setFloatingTimerPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY))
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -155,6 +231,19 @@ const Layout = ({ onLogout }) => {
       }
     };
   }, [timerInterval]);
+
+  // Track window size for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    // Set initial value
+    handleResize();
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const renderCurrentSection = () => {
     const sectionProps = { demoState, setDemoState, onSectionChange: handleSectionChange, navigate };
@@ -367,6 +456,76 @@ const Layout = ({ onLogout }) => {
 
         </aside>
       </div>
+      
+      {/* Floating Timer - shown when sidebar is collapsed or on mobile */}
+      {(isSidebarCollapsed || isMobile) && (
+        <div
+          ref={floatingTimerRef}
+          className="fixed bg-base-200 border border-base-300 rounded-lg shadow-xl p-3 cursor-move z-40 select-none hover:shadow-2xl transition-shadow"
+          style={{
+            left: `${floatingTimerPosition.x}px`,
+            top: `${floatingTimerPosition.y}px`,
+            width: '120px'
+          }}
+          onMouseDown={handleMouseDown}
+        >
+          <div className="space-y-2">
+            <div className="flex items-center justify-center gap-1">
+              <Clock className="w-3 h-3 text-primary" />
+              <Move className="w-3 h-3 text-base-content/50" />
+            </div>
+            
+            {/* Compact Timer Display */}
+            <div className="text-center">
+              <div className="text-lg font-mono font-bold text-base-content">
+                {formatTime(timerState.time)}
+              </div>
+              <div className="text-xs text-base-content/60">
+                {timerState.isRunning ? 'Running' : timerState.isPaused ? 'Paused' : 'Ready'}
+              </div>
+            </div>
+
+            {/* Compact Timer Controls */}
+            <div className="flex justify-center gap-1">
+              {!timerState.isRunning ? (
+                <button
+                  className="btn btn-primary btn-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startTimer();
+                  }}
+                  title="Start Timer"
+                >
+                  <Play className="w-3 h-3" />
+                </button>
+              ) : (
+                <button
+                  className="btn btn-warning btn-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    pauseTimer();
+                  }}
+                  title="Pause Timer"
+                >
+                  <Pause className="w-3 h-3" />
+                </button>
+              )}
+              
+              <button
+                className="btn btn-error btn-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  stopTimer();
+                }}
+                title="Stop Timer"
+                disabled={timerState.time === 0 && !timerState.isRunning}
+              >
+                <Square className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

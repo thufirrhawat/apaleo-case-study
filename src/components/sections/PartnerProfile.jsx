@@ -20,10 +20,8 @@ const PartnerProfile = ({ onSectionChange }) => {
       <div className="card bg-base-200 shadow-xl border border-base-300">
         <div className="card-body">
           <div className="flex flex-col sm:flex-row items-center gap-6 mb-6 text-center sm:text-left justify-center">
-            <div className="avatar">
-              <div className="w-20 h-20 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2 bg-white p-2">
-                <img src={straivLogo} alt="Straiv Logo" className="object-contain w-full h-full" />
-              </div>
+            <div className="w-20 h-20 bg-white rounded-lg shadow-lg p-2 flex items-center justify-center">
+              <img src={straivLogo} alt="Straiv Logo" className="max-w-full max-h-full object-contain" />
             </div>
             <div>
               <h2 className="text-3xl font-bold text-primary">Straiv</h2>
